@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "user_accounts", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id","account_id"})})
+@Table(name = "user_accounts", uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id","account_id"})}) //same user + same account → only once
 @Getter
 @Setter
 @NoArgsConstructor

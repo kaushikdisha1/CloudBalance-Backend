@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
 
     /* ================= VALIDATION ================= */
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler(MethodArgumentNotValidException.class)   //@valid @ResponseBody
     protected ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
         String msg = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
@@ -37,7 +37,7 @@ public class GlobalExceptionHandler {
                 .body(makeBody("ValidationError", msg, "INVALID_INPUT"));
     }
 
-    @ExceptionHandler(ConstraintViolationException.class)
+    @ExceptionHandler(ConstraintViolationException.class)  //Path or Query Params
     protected ResponseEntity<?> handleConstraint(ConstraintViolationException ex) {
         return ResponseEntity.badRequest()
                 .body(makeBody("ValidationError", ex.getMessage(), "INVALID_INPUT"));
@@ -45,13 +45,13 @@ public class GlobalExceptionHandler {
 
     /* ================= BUSINESS ERRORS ================= */
 
-    @ExceptionHandler(IllegalArgumentException.class)
+    @ExceptionHandler(IllegalArgumentException.class) //Sent invalid logical input 400
     protected ResponseEntity<?> handleBadRequest(IllegalArgumentException ex) {
         return ResponseEntity.badRequest()
                 .body(makeBody("BadRequest", ex.getMessage(), "BAD_REQUEST"));
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ExceptionHandler(DataIntegrityViolationException.class) //409 the request is valid but cannot be processed due to current resource state.
     protected ResponseEntity<?> handleDuplicate(DataIntegrityViolationException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(makeBody("Conflict", "Resource already exists", "DUPLICATE_RESOURCE"));
@@ -59,13 +59,13 @@ public class GlobalExceptionHandler {
 
     /* ================= ACCOUNT ERRORS ================= */
 
-    @ExceptionHandler(AccountRequiredException.class)
+    @ExceptionHandler(AccountRequiredException.class) //400 Missing required input
     protected ResponseEntity<?> handleAccountRequired(AccountRequiredException ex) {
         return ResponseEntity.badRequest()
                 .body(makeBody("AccountError", ex.getMessage(), "ACCOUNT_REQUIRED"));
     }
 
-    @ExceptionHandler(AccountNotAssignedException.class)
+    @ExceptionHandler(AccountNotAssignedException.class) //403 Access forbidden
     protected ResponseEntity<?> handleAccountNotAssigned(AccountNotAssignedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(makeBody("AccountError", ex.getMessage(), "ACCOUNT_NOT_ASSIGNED"));

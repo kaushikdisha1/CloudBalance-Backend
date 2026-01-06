@@ -25,12 +25,11 @@ repositories {
 }
 
 dependencies {
+    // Spring Boot Starters
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-web'           // includes webmvc + tomcat
+    implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
-
-    // Validation (Bean Validation / Jakarta)
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // JWT (JJWT)
@@ -38,29 +37,42 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
-    // Password hashing
+    // Security
     implementation 'org.springframework.security:spring-security-crypto'
 
-    // CSV parsing
+    // CSV Processing
     implementation 'org.apache.commons:commons-csv:1.10.0'
 
-    // MySQL driver
+    // Database
     runtimeOnly 'com.mysql:mysql-connector-j:8.3.0'
 
-    // Lombok (explicit version + annotation processing)
+    // ✅ NEW: Snowflake JDBC Driver
+    implementation 'net.snowflake:snowflake-jdbc:3.14.4'
+
+    // ✅ NEW: AWS SDK v2 (BOM for version management)
+    implementation platform('software.amazon.awssdk:bom:2.21.26')
+    implementation 'software.amazon.awssdk:ec2'
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:lambda'
+    implementation 'software.amazon.awssdk:sts'
+    implementation 'software.amazon.awssdk:dynamodb'
+    implementation 'software.amazon.awssdk:cloudwatch'
+    implementation 'software.amazon.awssdk:rds'
+
+    // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
     testCompileOnly 'org.projectlombok:lombok:1.18.30'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
 
-    // Devtools (optional)
+    // Devtools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
 
-    // Optional: OpenAPI / Swagger UI for API exploration by frontend teams
+    // Optional: OpenAPI / Swagger UI
     // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0'
 }
 

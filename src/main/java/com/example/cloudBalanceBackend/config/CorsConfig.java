@@ -8,8 +8,8 @@ import org.springframework.web.servlet.config.annotation.*;
 public class CorsConfig {
 
     @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        final String frontendOrigin = "http://localhost:3000";
+    public WebMvcConfigurer corsConfigurer() {  //callback interface
+        final String frontendOrigin = "http://localhost:5173";
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {

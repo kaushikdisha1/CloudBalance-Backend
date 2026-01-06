@@ -53,6 +53,7 @@ public class JwtUtil {
 
     /** Extract subject (userId) */
     public String getSubject(String token) {
+
         return validate(token).getBody().getSubject();
     }
 }

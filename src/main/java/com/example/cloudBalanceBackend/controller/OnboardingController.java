@@ -22,7 +22,7 @@ public class OnboardingController {
     public ResponseEntity<List<AccountDto>> onboardAccounts(@RequestBody List<String> accountIds,
                                                             Authentication auth) {
         List<AccountDto> created = onboardingService.onboardAccounts(accountIds, auth.getName());
-        return ResponseEntity.ok(created);
+        return ResponseEntity.ok(created); // Explicitly checking status
     }
 
     @GetMapping("/orphan-accounts")

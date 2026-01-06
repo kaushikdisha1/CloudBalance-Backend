@@ -16,12 +16,15 @@ public class AccountDto {
 
     // getters
     public String getId() {
+
         return id;
     }
     public String getStatus() {
+
         return status;
     }
     public Instant getCreatedAt() {
+
         return createdAt;
     }
 }

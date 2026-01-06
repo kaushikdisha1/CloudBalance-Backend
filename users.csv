@@ -1,0 +1,5 @@
+name,email,password,role,accountIds
+Alice Smith,alice@example.com,Pass@1234,CUSTOMER,acc-001
+Bob Jones,bob@example.com,Pass@5678,READ_ONLY,
+Charlie Brown,charlie@example.com,Pass@9012,CUSTOMER,"acc-001,acc-002"
+
