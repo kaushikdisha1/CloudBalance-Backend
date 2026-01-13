@@ -1,218 +1,150 @@
 package com.example.cloudBalanceBackend.service.snowflake;
 
-import com.example.cloudBalanceBackend.exception.SnowflakeException;
+import com.snowflake.snowpark.*;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.sql.*;
-import java.sql.Date;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SnowflakeService {
 
-    @Value("${snowflake.url:}")
-    private String snowflakeUrl;
+    private final Session session;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    @Value("${snowflake.user:}")
-    private String snowflakeUser;
+    // ✅ Map frontend groupBy to Snowflake columns
+    private static final Map<String, String> GROUP_BY_MAPPING = Map.of(
+            "service", "SERVICE",
+            "instanceType", "INSTANCE_TYPE",
+            "account", "ACCOUNT_ID",
+            "usageType", "USAGE_TYPE",
+            "platform", "PLATFORM",
+            "region", "REGION",
+            "usageTypeGroup", "USAGE_TYPE_GROUP",
+            "purchaseOption", "PURCHASE_OPTION",
+            "resource", "RESOURCE",
+            "availabilityZone", "AVAILABILITY_ZONE"
+    );
 
-    @Value("${snowflake.password:}")
-    private String snowflakePassword;
+    /**
+     * Fetch cost data grouped by the given column and date range with optional filters
+     */
+    public List<Map<String, Object>> getCostData(
+            String groupBy,
+            LocalDate startDate,
+            LocalDate endDate,
+            Map<String, List<String>> filters
+    ) {
+        String columnName = GROUP_BY_MAPPING.get(groupBy);
+        if (columnName == null) throw new IllegalArgumentException("Invalid groupBy: " + groupBy);
 
-    @Value("${snowflake.database:}")
-    private String snowflakeDatabase;
+        String sql = buildSQLQuery(columnName, startDate, endDate, filters);
+        log.info("Executing SQL: {}", sql);
 
-    @Value("${snowflake.schema:}")
-    private String snowflakeSchema;
-
-    @Value("${snowflake.warehouse:}")
-    private String snowflakeWarehouse;
-
-    private boolean isConfigured() {
-        boolean configured = snowflakeUrl != null && !snowflakeUrl.isEmpty()
-                && snowflakeUser != null && !snowflakeUser.isEmpty();
-        log.debug("Snowflake configured: {}", configured);
-        return configured;
-    }
-
-    private Connection getConnection() throws SQLException {
-        if (!isConfigured()) {
-            log.warn("Snowflake not configured, connection cannot be established");
-            throw new SnowflakeException("Snowflake not configured", null);
-        }
-
-        log.debug("Creating Snowflake connection: url={}, database={}, schema={}",
-                snowflakeUrl, snowflakeDatabase, snowflakeSchema);
-
-        Properties props = new Properties();
-        props.put("user", snowflakeUser);
-        props.put("password", snowflakePassword);
-        props.put("db", snowflakeDatabase);
-        props.put("schema", snowflakeSchema);
-        props.put("warehouse", snowflakeWarehouse);
-
-        return DriverManager.getConnection(snowflakeUrl, props);
-    }
-
-    public Map<String, Object> getCostData(String accountId) {
-        log.info("Fetching cost data for account: {}", accountId);
-
-        // If Snowflake not configured, return dummy data
-        if (!isConfigured()) {
-            log.info("Snowflake not configured, returning dummy data for account: {}", accountId);
-            return getDummyCostData(accountId);
-        }
-
-        try (Connection conn = getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT " +
-                             "  SUM(cost_usd) as total_cost, " +
-                             "  service_name, " +
-                             "  DATE_TRUNC('day', usage_date) as date " +
-                             "FROM cloud_costs " +
-                             "WHERE account_id = ? " +
-                             "  AND usage_date >= DATEADD(month, -1, CURRENT_DATE()) " +
-                             "GROUP BY service_name, DATE_TRUNC('day', usage_date) " +
-                             "ORDER BY date DESC"
-             )) {
-
-            log.debug("Executing Snowflake query for account: {}", accountId);
-            stmt.setString(1, accountId);
-            ResultSet rs = stmt.executeQuery();
-
-            double totalCost = 0;
-            Map<String, Double> byService = new HashMap<>();
-            List<Map<String, Object>> trend = new ArrayList<>();
-
-            while (rs.next()) {
-                double cost = rs.getDouble("total_cost");
-                String service = rs.getString("service_name");
-                Date date = rs.getDate("date");
-
-                totalCost += cost;
-                byService.merge(service, cost, Double::sum);
-                trend.add(Map.of("date", date.toString(), "cost", cost));
+        List<Map<String, Object>> transformedData = new ArrayList<>();
+        try {
+            var df = session.sql(sql);
+            var iter = df.toLocalIterator();
+            while (iter.hasNext()) {
+                var r = iter.next();
+                Map<String, Object> row = new HashMap<>();
+                row.put("group", r.get(0) != null ? r.get(0).toString() : "");
+                row.put("month", r.getString(1));
+                Object costObj = r.get(2);
+                row.put("cost", costObj instanceof Number ? ((Number) costObj).doubleValue() : 0.0);
+                transformedData.add(row);
             }
-
-            List<Map<String, Object>> serviceList = byService.entrySet().stream()
-                    .map(e -> Map.of("service", (Object) e.getKey(), "costUSD", (Object) e.getValue()))
-                    .toList();
-
-            log.info("Fetched cost data for account {}: totalCost={}, services={}",
-                    accountId, totalCost, byService.size());
-
-            return Map.of(
-                    "accountId", accountId,
-                    "totals", Map.of("costUSD", totalCost, "lastMonth", totalCost * 0.8),
-                    "byService", serviceList,
-                    "trend", trend
-            );
-
-        } catch (SQLException e) {
-            log.error("Failed to fetch cost data from Snowflake for account {}: {}",
-                    accountId, e.getMessage(), e);
-            throw new SnowflakeException("Failed to fetch cost data from Snowflake", e);
+            log.info("Successfully fetched {} rows", transformedData.size());
+            return transformedData;
+        } catch (Exception e) {
+            log.error("Snowflake query failed", e);
+            throw new RuntimeException("Failed to fetch cost data: " + e.getMessage(), e);
         }
     }
 
-    public Map<String, Object> getCostDataAllAccounts() {
-        log.info("Fetching cost data for all accounts");
+    /**
+     * Build SQL query dynamically based on groupBy, date range, and filters
+     */
+    private String buildSQLQuery(
+            String columnName,
+            LocalDate startDate,
+            LocalDate endDate,
+            Map<String, List<String>> filters
+    ) {
+        StringBuilder sql = new StringBuilder();
 
-        if (!isConfigured()) {
-            log.info("Snowflake not configured, returning dummy data for all accounts");
-            return getDummyCostDataAllAccounts();
-        }
+        sql.append("SELECT ")
+                .append(columnName).append(" AS GROUP_NAME, ")
+                .append("TO_VARCHAR(BILL_DATE, 'YYYY-MM') AS MONTH, ")
+                .append("SUM(COST) AS COSTS ")
+                .append("FROM SNOWFLAKE_LEARNING_DB.AWS_CUR.COSTREPORT ")
+                .append("WHERE BILL_DATE BETWEEN '")
+                .append(startDate.format(DATE_FORMATTER))
+                .append("' AND '")
+                .append(endDate.format(DATE_FORMATTER))
+                .append("' ");
 
-        try (Connection conn = getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                     "SELECT " +
-                             "  SUM(cost_usd) as total_cost, " +
-                             "  service_name, " +
-                             "  DATE_TRUNC('day', usage_date) as date " +
-                             "FROM cloud_costs " +
-                             "WHERE usage_date >= DATEADD(month, -1, CURRENT_DATE()) " +
-                             "GROUP BY service_name, DATE_TRUNC('day', usage_date) " +
-                             "ORDER BY date DESC"
-             )) {
+        // Add filters dynamically
+        if (filters != null && !filters.isEmpty()) {
+            for (Map.Entry<String, List<String>> entry : filters.entrySet()) {
+                if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    String filterColumn = GROUP_BY_MAPPING.getOrDefault(
+                            entry.getKey(),
+                            entry.getKey().toUpperCase()
+                    );
 
-            log.debug("Executing Snowflake query for all accounts");
+                    String values = entry.getValue().stream()
+                            .map(v -> "'" + v.replace("'", "''") + "'")
+                            .collect(Collectors.joining(", "));
 
-            double totalCost = 0;
-            Map<String, Double> byService = new HashMap<>();
-            List<Map<String, Object>> trend = new ArrayList<>();
-
-            while (rs.next()) {
-                double cost = rs.getDouble("total_cost");
-                String service = rs.getString("service_name");
-
-                LocalDate date = rs.getDate("date").toLocalDate();  // 👈 THIS LINE WAS MISSING
-
-                totalCost += cost;
-                byService.merge(service, cost, Double::sum);
-                trend.add(Map.of("date", date.toString(), "cost", cost));
+                    sql.append("AND ").append(filterColumn).append(" IN (").append(values).append(") ");
+                }
             }
-
-
-            List<Map<String, Object>> serviceList = byService.entrySet().stream()
-                    .map(e -> Map.of("service", (Object) e.getKey(), "costUSD", (Object) e.getValue()))
-                    .toList();
-
-            log.info("Fetched cost data for all accounts: totalCost={}, services={}",
-                    totalCost, byService.size());
-
-            return Map.of(
-                    "accountId", "all",
-                    "totals", Map.of("costUSD", totalCost, "lastMonth", totalCost * 0.85),
-                    "byService", serviceList,
-                    "trend", trend
-            );
-
-        } catch (SQLException e) {
-            log.error("Failed to fetch cost data from Snowflake for all accounts: {}",
-                    e.getMessage(), e);
-            throw new SnowflakeException("Failed to fetch cost data for all accounts", e);
         }
+
+        sql.append("GROUP BY ")
+                .append(columnName).append(", ")
+                .append("TO_VARCHAR(BILL_DATE, 'YYYY-MM') ")
+                .append("ORDER BY TO_VARCHAR(BILL_DATE, 'YYYY-MM')");
+
+        return sql.toString();
     }
 
-    // Fallback dummy data when Snowflake not configured
-    private Map<String, Object> getDummyCostData(String accountId) {
-        log.debug("Generating dummy cost data for account: {}", accountId);
-        return Map.of(
-                "accountId", accountId == null ? "all" : accountId,
-                "totals", Map.of("costUSD", 1234.56, "lastMonth", 980.12),
-                "byService", List.of(
-                        Map.of("service", "EC2", "costUSD", 400.1),
-                        Map.of("service", "S3", "costUSD", 234.5),
-                        Map.of("service", "RDS", "costUSD", 600.0)
-                ),
-                "trend", List.of(
-                        Map.of("date", "2025-12-01", "cost", 30.5),
-                        Map.of("date", "2025-12-02", "cost", 35.2),
-                        Map.of("date", "2025-12-03", "cost", 28.9)
-                )
-        );
-    }
+    /**
+     * Test Snowflake connection and fetch sample data
+     */
+    public List<Map<String, Object>> testConnection() {
+        log.info("Testing Snowflake connection...");
 
-    private Map<String, Object> getDummyCostDataAllAccounts() {
-        log.debug("Generating dummy cost data for all accounts");
-        return Map.of(
-                "accountId", "all",
-                "totals", Map.of("costUSD", 5678.90, "lastMonth", 4321.00),
-                "byService", List.of(
-                        Map.of("service", "S3", "costUSD", 1200.5),
-                        Map.of("service", "Lambda", "costUSD", 800.3),
-                        Map.of("service", "EC2", "costUSD", 2000.1)
-                ),
-                "trend", List.of(
-                        Map.of("date", "2025-12-01", "cost", 150.0),
-                        Map.of("date", "2025-12-02", "cost", 180.5),
-                        Map.of("date", "2025-12-03", "cost", 165.2)
-                )
-        );
+        try {
+            Row[] rows = session.sql(
+                    "SELECT * FROM SNOWFLAKE_LEARNING_DB.AWS_CUR.COSTREPORT  LIMIT 5"
+            ).collect();
+
+            log.info("Connection test successful. Retrieved {} rows", rows.length);
+
+            List<Map<String, Object>> transformed = Arrays.stream(rows)
+                    .map(r -> {
+                        Map<String, Object> row = new HashMap<>();
+                        for (int i = 0; i < r.size(); i++) {
+                            Object val = r.get(i);
+                            row.put("COL_" + i, val != null ? val.toString() : null);
+                        }
+                        return row;
+                    })
+                    .collect(Collectors.toList());
+
+            return transformed;
+
+        } catch (Exception e) {
+            log.error("Snowflake connection test failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Snowflake connection failed: " + e.getMessage(), e);
+        }
     }
 }

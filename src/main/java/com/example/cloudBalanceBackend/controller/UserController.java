@@ -1,5 +1,6 @@
 package com.example.cloudBalanceBackend.controller;
 
+import com.example.cloudBalanceBackend.dto.AccountDto;
 import com.example.cloudBalanceBackend.model.Role;
 import com.example.cloudBalanceBackend.model.User;
 import com.example.cloudBalanceBackend.service.UserService;
@@ -144,6 +145,44 @@ public class UserController {
                 "id", updated.getId(),
                 "email", updated.getEmail()
         ));
+    }
+
+    // Only the getUserById method needs updating in your UserController.java
+// Replace the existing getUserById method with this:
+
+    /**
+     * Admin & ReadOnly: get user by ID
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','READ_ONLY')")
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        try {
+            User user = userService.getUserById(id);
+            if (user == null) {
+                log.warn("User not found: {}", id);
+                return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+            }
+
+            List<AccountDto> accounts = userService.getUserAccounts(id);
+
+            // Return in format frontend expects
+            return ResponseEntity.ok(Map.of(
+                    "data", Map.of(
+                            "id", user.getId(),
+                            "firstName", user.getFirstName() != null ? user.getFirstName() : "",
+                            "lastName", user.getLastName() != null ? user.getLastName() : "",
+                            "name", user.getName() != null ? user.getName() : "",
+                            "email", user.getEmail(),
+                            "role", user.getRole().name(),
+                            "accounts", accounts.stream()
+                                    .map(AccountDto::getId)
+                                    .collect(java.util.stream.Collectors.toList())
+                    )
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching user by ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Internal Server Error"));
+        }
     }
 
     /**

@@ -63,6 +63,7 @@ public class UserService {
 
     public Page<UserDto> listUsers(Pageable pageable) {
         log.info("Listing users: page={}, size={}", pageable.getPageNumber(), pageable.getPageSize());
+
         Page<UserDto> users = userRepo.findAll(pageable).map(UserDto::fromEntity);
         log.info("Found {} users", users.getTotalElements());
         return users;
@@ -226,6 +227,15 @@ public class UserService {
         log.info("Successfully updated user: {}", userId);
         return user;
     }
+
+    public long countUsers() {
+        return userRepo.count();
+    }
+
+    public User getUserById(String userId) {
+        return userRepo.findById(userId).orElse(null);
+    }
+
 
     public List<AccountDto> getUserAccounts(String userId) {
         log.info("Fetching accounts for user: {}", userId);

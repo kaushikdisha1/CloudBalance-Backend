@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -16,7 +18,7 @@ import java.util.Set;
 @Builder
 public class User {
     @Id
-    @Column(length = 36)
+    @Column(length = 50)
     private String id;
 
     private String firstName;
@@ -36,7 +38,7 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private Set<UserAccount> account = new HashSet<>();
+    private List<UserAccount> account = new ArrayList<>();
 
     // convenience full name
     @Transient

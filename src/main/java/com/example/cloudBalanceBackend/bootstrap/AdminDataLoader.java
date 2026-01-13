@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
-@Component
+//@Component
 @RequiredArgsConstructor
 public class AdminDataLoader implements CommandLineRunner {
 

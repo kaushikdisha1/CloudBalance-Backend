@@ -1,21 +1,26 @@
 package com.example.cloudBalanceBackend.config;
 
 import com.example.cloudBalanceBackend.repository.RevokedTokenRepository;
-import com.example.cloudBalanceBackend.security.*;
+import com.example.cloudBalanceBackend.security.CustomUserDetailsService;
+import com.example.cloudBalanceBackend.security.JwtAuthenticationFilter;
+import com.example.cloudBalanceBackend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.web.*;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Collections;
+import java.util.List;
 
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
@@ -27,57 +32,112 @@ public class SecurityConfig {
     private final CustomUserDetailsService userDetailsService;
 
     /**
-     * Configure security filter chain
+     * 🔐 Main Spring Security configuration
      */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // Create JWT filter with UserDetailsService
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(
-                jwtUtil,
-                revokedTokenRepository,
-                userDetailsService
-        );
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        JwtAuthenticationFilter jwtFilter =
+                new JwtAuthenticationFilter(
+                        jwtUtil,
+                        revokedTokenRepository,
+                        userDetailsService
+                );
 
         http
+                // ✅ CORS
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // ❌ CSRF disabled (JWT = stateless)
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/auth/login", "/auth/login-manual").permitAll()  //public endpoints first
-                        .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/api/health").permitAll()
-                        .anyRequest().authenticated()   //catching all at the last
+
+                // ❌ No HTTP Session
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+
+                // 🔐 Authorization rules
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/auth/login",
+                                "/auth/login-manual",
+                                "/api/health",
+                                "/actuator/**",
+                                "/dashboard/cost-explorer",
+                                "/dashboard/cost-explorer/**"
+                        ).permitAll()
+                        .anyRequest().authenticated()
+                )
+
+                // 🔑 JWT filter
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
     /**
-     * Password encoder bean
+     * 🌐 CORS Configuration (FIXED & CORRECT)
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowCredentials(true);
+
+        // ✅ Frontend URL
+        config.setAllowedOrigins(List.of("http://localhost:5173"));
+
+        // ✅ HTTP methods browser is allowed to use
+        config.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")
+        );
+
+        // ✅ Headers browser is allowed to send
+        config.setAllowedHeaders(
+                List.of("Authorization", "Content-Type")
+        );
+
+        // ✅ Headers browser can read
+        config.setExposedHeaders(
+                List.of("Authorization")
+        );
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    /**
+     * 🔑 Password encoder
      */
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
-
         return new BCryptPasswordEncoder();
     }
 
     /**
-     * Authentication provider that uses UserDetailsService
-     * Compatible with Spring Security 6.4+
+     * 🔐 Authentication Provider
      */
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
+
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+
+        return provider;
     }
 
     /**
-     * Authentication manager bean
-     * Can be used for programmatic authentication
+     * 🔐 Authentication Manager
      */
     @Bean
     public AuthenticationManager authenticationManager() {
-        return new ProviderManager(Collections.singletonList(authenticationProvider()));
+        return new ProviderManager(
+                List.of(authenticationProvider())
+        );
     }
 }

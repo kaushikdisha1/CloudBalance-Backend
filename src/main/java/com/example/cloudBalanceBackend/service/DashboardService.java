@@ -11,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -22,74 +25,85 @@ public class DashboardService {
     private final AwsService awsService;
     private final UserAccountRepository uaRepo;
 
-    public Map<String, Object> getCostExplorer(Authentication auth, String accountId) {
-        Role role = getRole(auth);
-        String userId = auth.getName();
+    public List<Map<String, Object>> getCostExplorer(
+            Authentication auth,
+            String accountId,
+            String groupBy,
+            LocalDate startDate,
+            LocalDate endDate,
+            Map<String, List<String>> filters
+    ) {
+        log.info("DashboardService: Getting cost data for groupBy={}", groupBy);
 
-        log.info("Cost Explorer request: user={}, role={}, accountId={}", userId, role, accountId);
-
-        if (role == Role.CUSTOMER) {
-            // CUSTOMER must provide accountId
-            if (accountId == null) {
-                log.error("CUSTOMER {} did not provide accountId", userId);
-                throw new AccountRequiredException("accountId required for CUSTOMER");
-            }
-
-            // Verify account is assigned to this customer
-            boolean assigned = uaRepo.findByUserIdAndAccountId(userId, accountId).isPresent();
-            if (!assigned) {
-                log.error("CUSTOMER {} attempted to access unassigned account: {}", userId, accountId);
-                throw new AccountNotAssignedException("Account not assigned to user");
-            }
-
-            log.info("CUSTOMER {} accessing assigned account: {}", userId, accountId);
-            return snowflakeService.getCostData(accountId);
+        // Initialize filters if null
+        if (filters == null) {
+            filters = new HashMap<>();
         }
 
-        // Admin/ReadOnly → all accounts or specific account
-        if (accountId != null) {
-            log.info("{} accessing specific account: {}", role, accountId);
-            return snowflakeService.getCostData(accountId);
-        } else {
-            log.info("{} accessing all accounts", role);
-            return snowflakeService.getCostDataAllAccounts();
+        // Handle authentication and authorization
+        if (auth != null) {
+            Role role = getRole(auth);
+            String userId = auth.getName();
+
+            if (role == Role.CUSTOMER) {
+                if (accountId == null) {
+                    throw new AccountRequiredException("accountId required for CUSTOMER role");
+                }
+
+                boolean assigned = uaRepo
+                        .findByUserIdAndAccountId(userId, accountId)
+                        .isPresent();
+
+                if (!assigned) {
+                    throw new AccountNotAssignedException("Account not assigned to user");
+                }
+            }
+
+            // Add accountId filter if provided
+            if (accountId != null) {
+                filters.put("account", List.of(accountId));
+            }
         }
+
+        // Fetch data from Snowflake - THIS IS WHERE SNOWFLAKE IS QUERIED
+        log.info("Calling Snowflake service to fetch data...");
+        List<Map<String, Object>> result = snowflakeService.getCostData(
+                groupBy,
+                startDate,
+                endDate,
+                filters
+        );
+
+        log.info("Received {} rows from Snowflake", result.size());
+        return result;
     }
 
     public Map<String, Object> getAwsServices(Authentication auth, String accountId) {
         Role role = getRole(auth);
         String userId = auth.getName();
 
-        log.info("AWS Services request: user={}, role={}, accountId={}", userId, role, accountId);
-
         if (role == Role.CUSTOMER) {
-            // CUSTOMER must provide accountId
             if (accountId == null) {
-                log.error("CUSTOMER {} did not provide accountId", userId);
                 throw new AccountRequiredException("accountId required for CUSTOMER");
             }
 
-            // Verify account is assigned to this customer
-            boolean assigned = uaRepo.findByUserIdAndAccountId(userId, accountId).isPresent();
+            boolean assigned = uaRepo
+                    .findByUserIdAndAccountId(userId, accountId)
+                    .isPresent();
+
             if (!assigned) {
-                log.error("CUSTOMER {} attempted to access unassigned account: {}", userId, accountId);
                 throw new AccountNotAssignedException("Account not assigned to user");
             }
 
-            log.info("CUSTOMER {} accessing assigned account: {}", userId, accountId);
             return awsService.getServiceData(accountId);
         }
 
-        // Admin/ReadOnly → all accounts or specific account
-        if (accountId != null) {
-            log.info("{} accessing specific account: {}", role, accountId);
-            return awsService.getServiceData(accountId);
-        } else {
-            log.info("{} accessing all accounts", role);
-            return awsService.getServiceDataAllAccounts();
-        }
+        return (accountId != null)
+                ? awsService.getServiceData(accountId)
+                : awsService.getServiceDataAllAccounts();
     }
 
+    // ✅ ONLY ONE METHOD
     private Role getRole(Authentication auth) {
         String roleStr = auth.getAuthorities().stream()
                 .findFirst()
