@@ -31,9 +31,7 @@ public class SecurityConfig {
     private final RevokedTokenRepository revokedTokenRepository;
     private final CustomUserDetailsService userDetailsService;
 
-    /**
-     * 🔐 Main Spring Security configuration
-     */
+    //Main Spring Security configuration
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
@@ -45,20 +43,16 @@ public class SecurityConfig {
                 );
 
         http
-                // ✅ CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // ❌ CSRF disabled (JWT = stateless)
                 .csrf(csrf -> csrf.disable())
-
-                // ❌ No HTTP Session
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // 🔐 Authorization rules
+                // Authorization rules
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/error",
                                 "/auth/login",
                                 "/auth/login-manual",
                                 "/api/health",
@@ -69,15 +63,13 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // 🔑 JWT filter
+                // JWT filter
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    /**
-     * 🌐 CORS Configuration (FIXED & CORRECT)
-     */
+    // CORS Configuration (FIXED & CORRECT)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
@@ -85,20 +77,20 @@ public class SecurityConfig {
 
         config.setAllowCredentials(true);
 
-        // ✅ Frontend URL
+        // Frontend URL
         config.setAllowedOrigins(List.of("http://localhost:5173"));
 
-        // ✅ HTTP methods browser is allowed to use
+        // HTTP methods browser is allowed to use
         config.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")
         );
 
-        // ✅ Headers browser is allowed to send
+        // Headers browser is allowed to send
         config.setAllowedHeaders(
                 List.of("Authorization", "Content-Type")
         );
 
-        // ✅ Headers browser can read
+        // Headers browser can read
         config.setExposedHeaders(
                 List.of("Authorization")
         );
@@ -110,17 +102,13 @@ public class SecurityConfig {
         return source;
     }
 
-    /**
-     * 🔑 Password encoder
-     */
+    // Password encoder
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * 🔐 Authentication Provider
-     */
+    // Authentication Provider
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
 
@@ -131,9 +119,7 @@ public class SecurityConfig {
         return provider;
     }
 
-    /**
-     * 🔐 Authentication Manager
-     */
+    // Authentication Manager
     @Bean
     public AuthenticationManager authenticationManager() {
         return new ProviderManager(

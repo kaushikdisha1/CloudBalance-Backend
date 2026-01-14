@@ -6,9 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-/**
- * Utility class for accessing the currently authenticated user
- */
+// Utility class for accessing the currently authenticated user
 @Slf4j
 public class SecurityUtils {
 
@@ -16,9 +14,7 @@ public class SecurityUtils {
         // Utility class - no instantiation
     }
 
-    /**
-     * Get the current authenticated user's ID
-     */
+    // Get the current authenticated user's ID
     public static String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
@@ -44,9 +40,7 @@ public class SecurityUtils {
         return null;
     }
 
-    /**
-     * Get the current authenticated User entity
-     */
+    // Get the current authenticated User entity
     public static User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
@@ -68,9 +62,7 @@ public class SecurityUtils {
         return null;
     }
 
-    /**
-     * Get the current authenticated user's email
-     */
+    // Get the current authenticated user's email
     public static String getCurrentUserEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
@@ -90,9 +82,7 @@ public class SecurityUtils {
         return null;
     }
 
-    /**
-     * Check if current user is authenticated
-     */
+    // Check if current user is authenticated
     public static boolean isAuthenticated() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.isAuthenticated() && !(auth.getPrincipal() instanceof String);

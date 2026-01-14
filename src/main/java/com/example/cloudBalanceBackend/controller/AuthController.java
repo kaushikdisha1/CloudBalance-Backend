@@ -23,9 +23,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Enhanced Authentication Controller with UserDetailsService
- */
 @Slf4j
 @RestController
 @RequestMapping("/auth")
@@ -39,9 +36,6 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final CustomUserDetailsService userDetailsService;
 
-    /**
-     * Login endpoint - Option 1: Using AuthenticationManager (Recommended)
-     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest req) {
         log.info("Login attempt for email: {}", req.getEmail());
@@ -52,7 +46,6 @@ public class AuthController {
         }
 
         try {
-            // Authenticate using Spring Security's AuthenticationManager
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword())
             );
@@ -88,50 +81,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Login endpoint - Option 2: Manual validation (Your current approach)
-     * Keep this if you prefer manual control
-     */
-    @PostMapping("/login-manual")
-    public ResponseEntity<?> loginManual(@RequestBody AuthRequest req) {
-        log.info("Manual login attempt for email: {}", req.getEmail());
-
-        if (req.getEmail() == null || req.getPassword() == null) {
-            log.warn("Login failed: missing credentials");
-            return ResponseEntity.badRequest().body(Map.of("error", "Missing credentials"));
-        }
-
-        Optional<User> uOpt = userRepository.findByEmail(req.getEmail());
-        if (uOpt.isEmpty()) {
-            log.warn("Login failed: user not found - {}", req.getEmail());
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
-        }
-
-        User user = uOpt.get();
-        if (!encoder.matches(req.getPassword(), user.getPasswordHash())) {
-            log.warn("Login failed: incorrect password for user - {}", req.getEmail());
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
-        }
-
-        var claims = Map.<String, Object>of("role", user.getRole().name());
-        String token = jwtUtil.generateToken(user.getId(), claims);
-
-        long expirationMinutes = Long.parseLong(
-                System.getProperty("app.jwt.expiration-minutes", "15")
-        );
-
-        log.info("Manual login successful for user: {} with role: {}", user.getEmail(), user.getRole());
-
-        return ResponseEntity.ok(new AuthResponse(
-                token,
-                expirationMinutes,
-                user.getRole().name()
-        ));
-    }
-
-    /**
-     * Logout endpoint - revoke JWT token
-     */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader) {
         log.info("Logout request received");

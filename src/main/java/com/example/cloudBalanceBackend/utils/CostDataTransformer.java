@@ -9,9 +9,7 @@ import java.util.*;
 @Component
 public class CostDataTransformer {
 
-    /**
-     * Transform Snowflake data to frontend format
-     */
+    // Transform Snowflake data to frontend format
     public Map<String, Object> transform(List<Map<String, Object>> data, String groupBy) {
 
         log.info("Transforming {} rows for groupBy: {}", data.size(), groupBy);

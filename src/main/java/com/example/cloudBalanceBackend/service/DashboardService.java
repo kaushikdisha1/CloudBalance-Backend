@@ -46,26 +46,22 @@ public class DashboardService {
             String userId = auth.getName();
 
             if (role == Role.CUSTOMER) {
-                if (accountId == null) {
-                    throw new AccountRequiredException("accountId required for CUSTOMER role");
-                }
 
-                boolean assigned = uaRepo
-                        .findByUserIdAndAccountId(userId, accountId)
-                        .isPresent();
+                var accounts =uaRepo.findByUserId(userId);
 
-                if (!assigned) {
+                if (accounts.isEmpty()) {
                     throw new AccountNotAssignedException("Account not assigned to user");
                 }
+                accountId = accounts.get(0).getAccount().getId();
             }
 
             // Add accountId filter if provided
             if (accountId != null) {
-                filters.put("account", List.of(accountId));
+                filters.put("accountId", List.of(accountId));
             }
         }
 
-        // Fetch data from Snowflake - THIS IS WHERE SNOWFLAKE IS QUERIED
+        // Fetch data from Snowflake - SNOWFLAKE IS QUERIED
         log.info("Calling Snowflake service to fetch data...");
         List<Map<String, Object>> result = snowflakeService.getCostData(
                 groupBy,
@@ -103,7 +99,6 @@ public class DashboardService {
                 : awsService.getServiceDataAllAccounts();
     }
 
-    // ✅ ONLY ONE METHOD
     private Role getRole(Authentication auth) {
         String roleStr = auth.getAuthorities().stream()
                 .findFirst()

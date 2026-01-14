@@ -1,5 +1,6 @@
 package com.example.cloudBalanceBackend.service.snowflake;
 
+import com.example.cloudBalanceBackend.exception.AnalyticsQueryException;
 import com.snowflake.snowpark.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,11 +19,11 @@ public class SnowflakeService {
     private final Session session;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    // ✅ Map frontend groupBy to Snowflake columns
+    // Map frontend groupBy to Snowflake columns
     private static final Map<String, String> GROUP_BY_MAPPING = Map.of(
             "service", "SERVICE",
             "instanceType", "INSTANCE_TYPE",
-            "account", "ACCOUNT_ID",
+            "accountId", "ACCOUNT_ID",
             "usageType", "USAGE_TYPE",
             "platform", "PLATFORM",
             "region", "REGION",
@@ -32,9 +33,7 @@ public class SnowflakeService {
             "availabilityZone", "AVAILABILITY_ZONE"
     );
 
-    /**
-     * Fetch cost data grouped by the given column and date range with optional filters
-     */
+    // Fetch cost data grouped by the given column and date range with optional filters
     public List<Map<String, Object>> getCostData(
             String groupBy,
             LocalDate startDate,
@@ -68,9 +67,7 @@ public class SnowflakeService {
         }
     }
 
-    /**
-     * Build SQL query dynamically based on groupBy, date range, and filters
-     */
+    // Build SQL query dynamically based on groupBy, date range, and filters
     private String buildSQLQuery(
             String columnName,
             LocalDate startDate,
@@ -103,7 +100,11 @@ public class SnowflakeService {
                             .map(v -> "'" + v.replace("'", "''") + "'")
                             .collect(Collectors.joining(", "));
 
-                    sql.append("AND ").append(filterColumn).append(" IN (").append(values).append(") ");
+                    sql.append("AND ")
+                            .append(filterColumn)
+                            .append(" IN (")
+                            .append(values)
+                            .append(") ");
                 }
             }
         }
@@ -116,9 +117,7 @@ public class SnowflakeService {
         return sql.toString();
     }
 
-    /**
-     * Test Snowflake connection and fetch sample data
-     */
+    // Test Snowflake connection and fetch sample data
     public List<Map<String, Object>> testConnection() {
         log.info("Testing Snowflake connection...");
 
@@ -144,7 +143,7 @@ public class SnowflakeService {
 
         } catch (Exception e) {
             log.error("Snowflake connection test failed: {}", e.getMessage(), e);
-            throw new RuntimeException("Snowflake connection failed: " + e.getMessage(), e);
+            throw new AnalyticsQueryException("Snowflake connection failed: " + e.getMessage(), e);
         }
     }
 }

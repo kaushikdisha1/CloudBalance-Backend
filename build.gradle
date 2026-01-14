@@ -51,13 +51,13 @@ dependencies {
     // Database
     runtimeOnly 'com.mysql:mysql-connector-j:8.3.0'
 
-    // ✅ Snowflake JDBC + Snowpark
-    implementation 'net.snowflake:snowflake-jdbc:3.19.1' // ✅ stable version
+    // Snowflake JDBC + Snowpark
+    implementation 'net.snowflake:snowflake-jdbc:3.19.1' // stable version
     implementation("com.snowflake:snowpark_2.13:1.18.0") {
         exclude group: 'org.slf4j', module: 'slf4j-simple'
     }
 
-    // ✅ AWS SDK v2 (BOM for version management)
+    // AWS SDK v2 (BOM for version management)
     implementation platform('software.amazon.awssdk:bom:2.21.26')
     implementation 'software.amazon.awssdk:ec2'
     implementation 'software.amazon.awssdk:s3'

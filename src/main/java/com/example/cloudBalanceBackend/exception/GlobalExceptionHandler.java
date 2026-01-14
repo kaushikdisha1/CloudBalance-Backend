@@ -101,10 +101,10 @@ public class GlobalExceptionHandler {
 
     /* ================= FALLBACK ================= */
 
-    @ExceptionHandler(Exception.class)
-    protected ResponseEntity<?> handleAll(Exception ex, WebRequest req) {
-        ex.printStackTrace();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(makeBody("ServerError", "Something went wrong", "INTERNAL_ERROR"));
-    }
+//    @ExceptionHandler(Exception.class)
+//    protected ResponseEntity<?> handleAll(Exception ex, WebRequest req) {
+//        ex.printStackTrace();
+//        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                .body(makeBody("ServerError", "Something went wrong", "INTERNAL_ERROR"));
+//    }
 }

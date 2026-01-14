@@ -36,6 +36,7 @@ public class AccountController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','READ_ONLY','CUSTOMER')")
     public ResponseEntity<List<AccountDto>> listAccounts(Authentication auth) {
+
         // Use SecurityUtils to get current user
         User user = SecurityUtils.getCurrentUser();
         return ResponseEntity.ok(accountService.listVisibleAccounts(user));
